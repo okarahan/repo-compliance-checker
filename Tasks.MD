@@ -27,12 +27,13 @@ Jeder Task hat eine ID **`RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 ## Package: `config` (Configuration)
 
 - [x] **RCC-1** — Input-Dateien definieren: `repos.json` (Slugs `org/repo`) und `allowed_technologies.json` (erlaubte Techs)
-- [ ] **RCC-2** — JSON-Schemas und Beispieldateien im Repo ablegen
-- [ ] **RCC-3** — JSON parsen und validieren (leer, ungültiger Slug, Duplikate)
-- [ ] **RCC-4** — Normalisierung der erlaubten Namen (z. B. `Node.js` → `nodejs`)
-- [ ] **RCC-5** — *(Optional)* `settings.json` für Workdir, Output-Pfad, Strict-Mode
+- [ ] **RCC-2** — JSON-Schemas und Beispieldateien im Repo ablegen — **skipped:** JSON Schema (`.schema.json`) wird nicht umgesetzt; Beispieldateien liegen unter `config/` (RCC-1).
+- [ ] **RCC-3** — JSON parsen und validieren (leer, ungültiger Slug, Duplikate) — **skipped:** keine Validierung; wir gehen davon aus, dass die JSON-Dateien die erwartete Struktur haben.
+- [ ] **RCC-4** — Normalisierung der erlaubten Namen (z. B. `Node.js` → `nodejs`) — **skipped:** keine Normalisierung; Client/Service/User liefert erlaubte Namen in der Form, die später mit der Detektion verglichen wird.
+- [ ] **RCC-5** — *(Optional)* `settings.json` für Workdir, Output-Pfad, Strict-Mode — **skipped:** keine separate Settings-Datei; Pfade vorerst per CLI-Flags oder Defaults.
+- [x] **RCC-49** — JSON-Dateien lesen und in Models schreiben (`internal/config`: `repos.json` → `model.ReposConfig`, `allowed_technologies.json` → `model.AllowedTechnologies`)
 
-**Done:** Config lädt beide Dateien und liefert Repos + Allowed-Set an den Rest.
+**Done:** `internal/config` liest beide JSON-Dateien und liefert befüllte Models an den Rest (ohne Validierung/Normalisierung).
 
 ---
 

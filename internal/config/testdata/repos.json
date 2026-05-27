@@ -1,0 +1,8 @@
+{
+  "repos": [
+    {
+      "slug": "org/example",
+      "ref": "main"
+    }
+  ]
+}
