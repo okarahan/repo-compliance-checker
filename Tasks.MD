@@ -26,7 +26,7 @@ Jeder Task hat eine ID **`RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 
 ## Package: `config` (Configuration)
 
-- [ ] **RCC-1** — Input-Dateien definieren: `repos.json` (Slugs `org/repo`) und `allowed_technologies.json` (erlaubte Techs)
+- [x] **RCC-1** — Input-Dateien definieren: `repos.json` (Slugs `org/repo`) und `allowed_technologies.json` (erlaubte Techs)
 - [ ] **RCC-2** — JSON-Schemas und Beispieldateien im Repo ablegen
 - [ ] **RCC-3** — JSON parsen und validieren (leer, ungültiger Slug, Duplikate)
 - [ ] **RCC-4** — Normalisierung der erlaubten Namen (z. B. `Node.js` → `nodejs`)

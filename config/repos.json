@@ -1,0 +1,12 @@
+{
+  "repos": [
+    {
+      "slug": "golang/go",
+      "ref": "master"
+    },
+    {
+      "slug": "kubernetes/kubernetes",
+      "ref": "master"
+    }
+  ]
+}
