@@ -1,4 +1,4 @@
-package api_fetcher
+package endpoints
 
 import (
 	"context"
@@ -8,19 +8,22 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher/client"
 )
 
 // LanguagesResponse maps language name to number of bytes of code.
 // This is GitHub Linguist's output for the repo's default branch.
 type LanguagesResponse map[string]int64
 
-// TODO: common response handling and common request generation, GetLanguages should have only
-// the API call and the response mapping
-func (c *Client) GetLanguages(ctx context.Context, owner, repo string) (LanguagesResponse, error) {
+func GetLanguages(ctx context.Context, c *client.Client, owner, repo string) (LanguagesResponse, error) {
 	owner = strings.TrimSpace(owner)
 	repo = strings.TrimSpace(repo)
 	if owner == "" || repo == "" {
 		return nil, fmt.Errorf("owner and repo are required")
+	}
+	if c == nil {
+		return nil, fmt.Errorf("client is nil")
 	}
 
 	path := fmt.Sprintf("/repos/%s/%s/languages", url.PathEscape(owner), url.PathEscape(repo))
@@ -47,3 +50,4 @@ func (c *Client) GetLanguages(ctx context.Context, owner, repo string) (Language
 	}
 	return out, nil
 }
+

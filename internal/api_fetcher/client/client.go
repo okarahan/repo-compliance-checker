@@ -1,4 +1,4 @@
-package api_fetcher
+package client
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ type Client struct {
 	token      string
 }
 
-type ClientOptions struct {
+type Options struct {
 	// BaseURL defaults to https://api.github.com/.
 	BaseURL string
 
@@ -22,7 +22,7 @@ type ClientOptions struct {
 	HTTPClient *http.Client
 }
 
-func NewClient(token string, opts ClientOptions) (*Client, error) {
+func New(token string, opts Options) (*Client, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return nil, fmt.Errorf("github token is empty")
@@ -65,7 +65,6 @@ func (c *Client) NewRequest(method, path string) (*http.Request, error) {
 		return nil, err
 	}
 
-	// GitHub accepts "token" or "Bearer"; "Bearer" is the modern form.
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "repo-compliance-checker")

@@ -1,4 +1,4 @@
-package api_fetcher_test
+package endpoints_test
 
 import (
 	"context"
@@ -6,10 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher"
+	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher/client"
+	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher/endpoints"
 )
 
-func TestClient_GetTopics(t *testing.T) {
+func TestGetTopics(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/repos/golang/go" {
 			t.Fatalf("path=%q", r.URL.Path)
@@ -22,12 +23,12 @@ func TestClient_GetTopics(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c, err := api_fetcher.NewClient("t", api_fetcher.ClientOptions{BaseURL: srv.URL})
+	c, err := client.New("t", client.Options{BaseURL: srv.URL})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	topics, err := c.GetTopics(context.Background(), "golang", "go")
+	topics, err := endpoints.GetTopics(context.Background(), c, "golang", "go")
 	if err != nil {
 		t.Fatal(err)
 	}

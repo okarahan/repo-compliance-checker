@@ -1,4 +1,4 @@
-package api_fetcher
+package client
 
 import (
 	"bufio"
@@ -16,7 +16,6 @@ const (
 // If the token is present in the process environment, it takes precedence.
 //
 // This function intentionally does not validate token format; it only loads it.
-// TODO: refactor and make it more readbale
 func ReadGitHubToken(envFilePath string) (string, error) {
 	if v := strings.TrimSpace(os.Getenv(EnvGitHubToken)); v != "" {
 		return v, nil
@@ -65,3 +64,4 @@ func readDotEnv(path string) (map[string]string, error) {
 	}
 	return out, nil
 }
+

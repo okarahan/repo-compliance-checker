@@ -1,22 +1,22 @@
-package api_fetcher_test
+package client_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher"
+	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher/client"
 )
 
 func TestReadGitHubToken_fromEnvFile(t *testing.T) {
-	t.Setenv(api_fetcher.EnvGitHubToken, "")
+	t.Setenv(client.EnvGitHubToken, "")
 
 	envPath := filepath.Join(t.TempDir(), ".env")
 	if err := os.WriteFile(envPath, []byte("GITHUB_TOKEN=abc123\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := api_fetcher.ReadGitHubToken(envPath)
+	got, err := client.ReadGitHubToken(envPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,14 +26,14 @@ func TestReadGitHubToken_fromEnvFile(t *testing.T) {
 }
 
 func TestReadGitHubToken_envTakesPrecedence(t *testing.T) {
-	t.Setenv(api_fetcher.EnvGitHubToken, "from-env")
+	t.Setenv(client.EnvGitHubToken, "from-env")
 
 	envPath := filepath.Join(t.TempDir(), ".env")
 	if err := os.WriteFile(envPath, []byte("GITHUB_TOKEN=from-file\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := api_fetcher.ReadGitHubToken(envPath)
+	got, err := client.ReadGitHubToken(envPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,14 +43,14 @@ func TestReadGitHubToken_envTakesPrecedence(t *testing.T) {
 }
 
 func TestReadGitHubToken_missing(t *testing.T) {
-	t.Setenv(api_fetcher.EnvGitHubToken, "")
+	t.Setenv(client.EnvGitHubToken, "")
 
 	envPath := filepath.Join(t.TempDir(), ".env")
 	if err := os.WriteFile(envPath, []byte("# empty\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := api_fetcher.ReadGitHubToken(envPath)
+	_, err := client.ReadGitHubToken(envPath)
 	if err == nil {
 		t.Fatal("expected error")
 	}

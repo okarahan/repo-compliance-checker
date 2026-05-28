@@ -1,4 +1,4 @@
-package api_fetcher
+package endpoints
 
 import (
 	"context"
@@ -8,19 +8,22 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher/client"
 )
 
 type repoResponse struct {
 	Topics []string `json:"topics"`
 }
 
-// TODO: common response handling and common request generation, GetTopics should have only
-// the API call and the response mapping
-func (c *Client) GetTopics(ctx context.Context, owner, repo string) ([]string, error) {
+func GetTopics(ctx context.Context, c *client.Client, owner, repo string) ([]string, error) {
 	owner = strings.TrimSpace(owner)
 	repo = strings.TrimSpace(repo)
 	if owner == "" || repo == "" {
 		return nil, fmt.Errorf("owner and repo are required")
+	}
+	if c == nil {
+		return nil, fmt.Errorf("client is nil")
 	}
 
 	path := fmt.Sprintf("/repos/%s/%s", url.PathEscape(owner), url.PathEscape(repo))
@@ -50,3 +53,4 @@ func (c *Client) GetTopics(ctx context.Context, owner, repo string) ([]string, e
 	}
 	return out.Topics, nil
 }
+

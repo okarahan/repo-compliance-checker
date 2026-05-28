@@ -1,22 +1,22 @@
-package api_fetcher_test
+package client_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher"
+	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher/client"
 )
 
-func TestNewClient_requiresToken(t *testing.T) {
-	_, err := api_fetcher.NewClient("", api_fetcher.ClientOptions{})
+func TestNew_requiresToken(t *testing.T) {
+	_, err := client.New("", client.Options{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
 func TestClient_NewRequest_setsAuthHeader(t *testing.T) {
-	c, err := api_fetcher.NewClient("abc123", api_fetcher.ClientOptions{BaseURL: "https://example.test/"})
+	c, err := client.New("abc123", client.Options{BaseURL: "https://example.test/"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestClient_Do_usesHTTPClient(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c, err := api_fetcher.NewClient("t", api_fetcher.ClientOptions{BaseURL: srv.URL})
+	c, err := client.New("t", client.Options{BaseURL: srv.URL})
 	if err != nil {
 		t.Fatal(err)
 	}
