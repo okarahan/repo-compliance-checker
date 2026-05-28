@@ -26,6 +26,15 @@ func LoadAllowedTechnologies(path string) (model.AllowedTechnologies, error) {
 	return cfg, nil
 }
 
+// LoadManifestMap reads the manifest mapping JSON from path and unmarshals it into model.ManifestMapConfig.
+func LoadManifestMap(path string) (model.ManifestMapConfig, error) {
+	var cfg model.ManifestMapConfig
+	if err := loadJSON(path, &cfg); err != nil {
+		return model.ManifestMapConfig{}, fmt.Errorf("load manifest map config: %w", err)
+	}
+	return cfg, nil
+}
+
 func loadJSON(path string, dest any) error {
 	b, err := os.ReadFile(path)
 	if err != nil {

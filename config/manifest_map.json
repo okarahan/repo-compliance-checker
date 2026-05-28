@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "by_language": {
+    "go": {
+      "files": ["go.mod", "go.sum"]
+    },
+    "python": {
+      "files": ["pyproject.toml", "requirements.txt", "ruff.toml"]
+    },
+    "javascript": {
+      "files": ["package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
+    },
+    "typescript": {
+      "files": [
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.base.json",
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml"
+      ]
+    },
+    "java": {
+      "files": [
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "settings.gradle",
+        "settings.gradle.kts",
+        "gradle/wrapper/gradle-wrapper.properties",
+        "mvnw",
+        "mvnw.cmd",
+        "gradlew",
+        "gradlew.bat"
+      ]
+    }
+  },
+  "global": {
+    "files": ["Dockerfile"],
+    "directories": [".github/workflows"]
+  }
+}
+

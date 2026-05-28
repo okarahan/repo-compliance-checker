@@ -64,3 +64,23 @@ func TestLoadRepos_missingFile(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+func TestLoadManifestMap(t *testing.T) {
+	path := filepath.Join("..", "..", "config", "manifest_map.json")
+	cfg, err := config.LoadManifestMap(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Version != 1 {
+		t.Fatalf("version=%d, want 1", cfg.Version)
+	}
+	if len(cfg.ByLanguage) == 0 {
+		t.Fatal("expected by_language to be non-empty")
+	}
+	if _, ok := cfg.ByLanguage["go"]; !ok {
+		t.Fatal("expected go entry in by_language")
+	}
+	if len(cfg.Global.Files) == 0 {
+		t.Fatal("expected global.files to be non-empty")
+	}
+}
