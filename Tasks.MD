@@ -16,11 +16,14 @@ Jeder Task hat eine ID **`RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 |---------|------|--------|
 | CLI | `cmd/repo-compliance-checker/` | Einstieg, Flags, Orchestrierung |
 | Configuration | `internal/config/` | `repos.json` + `allowed_technologies.json` lesen |
-| Repo-Fetcher | `internal/repo_fetcher/` | Repo lokal bereitstellen (clone/download) |
-| Analyzer | `internal/analyzer/` | Technologien im Repo erkennen |
+| API-Fetcher | `internal/api_fetcher/` | Manifeste & Metadaten per GitHub REST API (primär; nur GitHub) |
+| Repo-Fetcher | `internal/repo_fetcher/` | Fallback: shallow clone / ZIP nach `.work/` (nur GitHub) |
+| Analyzer | `internal/analyzer/` | Technologien aus gelieferten Dateiinhalten erkennen |
 | Report | `internal/report/` | Compliance-Check + Report schreiben |
-| Model (optional) | `internal/model/` | Gemeinsame Structs (DetectedTech, Report) |
+| Model | `internal/model/` | Gemeinsame Structs (Input, Scan, Report; Snapshot später) |
 | Ausgabe | `reports/` | Generierte Report-Dateien (nicht Source) |
+
+**Reihenfolge:** zuerst `api_fetcher`. `repo_fetcher` und Hybrid-Orchestrierung → später.
 
 ---
 
@@ -37,14 +40,39 @@ Jeder Task hat eine ID **`RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 
 ---
 
-## Package: `repo_fetcher` (Repository Acquisition)
+## Package: `repo_fetcher` (Fallback — lokaler Checkout)
 
-- [ ] **RCC-6** — Checkout-Strategie festlegen (git shallow clone vs. ZIP-Fallback)
-- [ ] **RCC-7** — Arbeitsverzeichnis (z. B. `.work/`) anlegen und bei erneutem Lauf wiederverwenden
-- [ ] **RCC-8** — Fehlerfälle behandeln (Repo nicht gefunden, kein Netz, falscher Slug)
-- [ ] **RCC-9** — Lokalen Pfad zum Repo-Root zurückgeben (für Analyzer)
+> **Info:** Aktuell nur **GitHub** (`org/repo` → `https://github.com/...`). GitLab, Bitbucket o. Ä. sind nicht vorgesehen.
 
-**Done:** Für jeden Slug aus `repos.json` liegt ein analysierbares Verzeichnis vor.
+*Noch keine Tasks — kommt nach `api_fetcher`.*
+
+---
+
+## Package: `api_fetcher` (GitHub REST API)
+
+> **Info:** Aktuell nur **GitHub**. Kein generischer Fetcher für GitLab/Bitbucket.
+>
+> **Hinweis `ref`:** Der Endpoint **Languages** (Linguist) bezieht sich auf den **Default-Branch** des Repos — GitHub liefert dort **kein** `ref` für Sprachstatistik. `ref` aus `repos.json` für spätere Endpoints (z. B. Dateiinhalte) merken; bei Languages im Report ggf. als Annahme dokumentieren.
+
+- [ ] **RCC-50** — `GITHUB_TOKEN` aus `.env` lesen (`.env` in `.gitignore`; optional `.env.example` ohne Secret)
+- [ ] **RCC-51** — HTTP-Client für GitHub REST anlegen (Base-URL, Auth-Header mit Token)
+- [ ] **RCC-52** — Für `org/repo`: **Programmiersprachen** (Linguist) auslesen → `GET /repos/{owner}/{repo}/languages`
+- [ ] **RCC-53** — Für `org/repo`: **Topics** auslesen (Repo-Labels, z. B. `docker`, `golang`) → `GET /repos/{owner}/{repo}` (Feld `topics`) oder `GET /repos/{owner}/{repo}/topics` (leere Liste = ok)
+
+**Done:** Token + Client stehen; für ein Repo sind Sprachen (Linguist) und Topics verfügbar (als Struct/Map zurückgeben).
+
+### Was GitHub API sonst noch hergibt (später / optional)
+
+| Quelle | Endpoint / Weg | Nutzen für Compliance |
+|--------|------------------|------------------------|
+| **Repo-Metadaten** | `GET /repos/{owner}/{repo}` | Default-Branch, Beschreibung, Archiv-Status |
+| **Einzeldateien** | **Contents API** `GET /repos/{owner}/{repo}/contents/{path}?ref=` | `go.mod`, `package.json`, `Dockerfile`, … (Base64-Inhalt; Ordner = Liste) |
+| **Workflows** | Contents `.github/workflows/` | GitHub Actions, CI-Tools |
+| **Release-Tags** | Releases API | Versionen; wenig für Tech-Stack |
+| **Dependency Graph** | Dependency-API | Abhängigkeiten — oft eingeschränkt / nicht überall |
+| **README** | Contents `README.md` | Schwache Heuristik („Built with …“) |
+
+Für **Frameworks & Utilities** (JUnit, Spring, Ruff, …) reicht **Languages + Topics meist nicht** — dafür später Contents API (Einzeldateien) oder `repo_fetcher`.
 
 ---
 
@@ -84,7 +112,7 @@ Jeder Task hat eine ID **`RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 ## Package: `cmd` (CLI)
 
 - [ ] **RCC-29** — Flags: `--repos`, `--allowed`, `--workdir`, `--out` (Default: `reports/`)
-- [ ] **RCC-30** — Pipeline verdrahten: Config → fetch → analyze → report
+- [ ] **RCC-30** — Pipeline verdrahten: Config → `api_fetcher` → analyze → report (`repo_fetcher` später)
 - [ ] **RCC-31** — Fehler auf stderr, sinnvolle Exit-Codes
 
 **Done:** `go run ./cmd/repo-compliance-checker` mit Beispiel-JSONs lauffähig.
@@ -127,6 +155,12 @@ Jeder Task hat eine ID **`RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 
 - [ ] **RCC-47** — AI-Unterstützung (Claude): nur Evidence/Metadaten, Ergebnis als „AI-assisted“ markieren
 - [ ] **RCC-48** — HTML-Report oder schönerer Markdown-Output
+
+---
+
+## Später (noch keine Tasks)
+
+- **Fetch-Orchestrierung / Snapshot:** Ergebnisse von `api_fetcher` + `repo_fetcher` zusammenführen; einheitliches Modell für den Analyzer (z. B. `RepoSnapshot` in `model`) — bewusst zurückgestellt.
 
 ---
 

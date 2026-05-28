@@ -14,6 +14,9 @@ reports/
 *.test
 *.out
 
+# Secrets (GitHub token)
+.env
+
 # OS / editor
 .DS_Store
 .idea/
