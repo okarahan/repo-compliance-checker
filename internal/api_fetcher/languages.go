@@ -14,6 +14,8 @@ import (
 // This is GitHub Linguist's output for the repo's default branch.
 type LanguagesResponse map[string]int64
 
+// TODO: common response handling and common request generation, GetLanguages should have only
+// the API call and the response mapping
 func (c *Client) GetLanguages(ctx context.Context, owner, repo string) (LanguagesResponse, error) {
 	owner = strings.TrimSpace(owner)
 	repo = strings.TrimSpace(repo)
@@ -45,4 +47,3 @@ func (c *Client) GetLanguages(ctx context.Context, owner, repo string) (Language
 	}
 	return out, nil
 }
-
