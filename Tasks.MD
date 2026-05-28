@@ -59,7 +59,8 @@ Jeder Task hat eine ID `**RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 - **RCC-50** — `GITHUB_TOKEN` aus `.env` lesen (**done**; `internal/api_fetcher/token.go`)
 - **RCC-51** — HTTP-Client für GitHub REST anlegen (Base-URL, Auth-Header mit Token) (**done**; `internal/api_fetcher/client.go`)
 - **RCC-52** — Für `org/repo`: **Programmiersprachen** (Linguist) auslesen → `GET /repos/{owner}/{repo}/languages` (**done**; `internal/api_fetcher/languages.go`)
-- **RCC-53** — Für `org/repo`: **Topics** auslesen (Repo-Labels, z. B. `docker`, `golang`) → `GET /repos/{owner}/{repo}` (Feld `topics`) oder `GET /repos/{owner}/{repo}/topics`
+- **RCC-53** — Für `org/repo`: **Topics** auslesen (Repo-Labels, z. B. `docker`, `golang`) → `GET /repos/{owner}/{repo}` (Feld `topics`) oder `GET /repos/{owner}/{repo}/topics` (**done**; `internal/api_fetcher/topics.go`)
+- **RCC-54** — *(Optional / später)* `api_fetcher` in Subpackages aufteilen: `client` (Token + HTTP) und `endpoints` (languages/topics), um Dateianzahl pro Package klein zu halten
 
 **Done:** Token + Client stehen; für ein Repo sind Sprachen (Linguist) und Topics verfügbar (als Struct/Map zurückgeben).
 
