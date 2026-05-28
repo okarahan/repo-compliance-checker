@@ -17,6 +17,7 @@ Jeder Task hat eine ID `**RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 | ---------------- | ------------------------------ | ------------------------------------------------ |
 | CLI              | `cmd/repo-compliance-checker/` | Einstieg, Flags, Orchestrierung                  |
 | Configuration    | `internal/config/`             | `repos.json` + `allowed_technologies.json` lesen |
+| API-Fetcher      | `internal/api_fetcher/`        | GitHub REST API: Token/HTTP + Metadaten/Dateien  |
 | Repo-Fetcher     | `internal/repo_fetcher/`       | Repo lokal bereitstellen (clone/download)        |
 | Analyzer         | `internal/analyzer/`           | Technologien im Repo erkennen                    |
 | Report           | `internal/report/`             | Compliance-Check + Report schreiben              |
@@ -46,6 +47,21 @@ Jeder Task hat eine ID `**RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 - **RCC-9** — Lokalen Pfad zum Repo-Root zurückgeben (für Analyzer)
 
 **Done:** Für jeden Slug aus `repos.json` liegt ein analysierbares Verzeichnis vor.
+
+---
+
+## Package: `api_fetcher` (GitHub REST API)
+
+> **Info:** Aktuell nur **GitHub**. Kein generischer Fetcher für GitLab/Bitbucket.
+>
+> **Hinweis `ref`:** Der Endpoint **Languages** (Linguist) bezieht sich auf den **Default-Branch** des Repos — GitHub liefert dort **kein** `ref` für Sprachstatistik. `ref` aus `repos.json` für spätere Endpoints (z. B. Dateiinhalte) merken; bei Languages im Report ggf. als Annahme dokumentieren.
+
+- **RCC-50** — `GITHUB_TOKEN` aus `.env` lesen (**done**; `internal/api_fetcher/token.go`)
+- **RCC-51** — HTTP-Client für GitHub REST anlegen (Base-URL, Auth-Header mit Token)
+- **RCC-52** — Für `org/repo`: **Programmiersprachen** (Linguist) auslesen → `GET /repos/{owner}/{repo}/languages`
+- **RCC-53** — Für `org/repo`: **Topics** auslesen (Repo-Labels, z. B. `docker`, `golang`) → `GET /repos/{owner}/{repo}` (Feld `topics`) oder `GET /repos/{owner}/{repo}/topics`
+
+**Done:** Token + Client stehen; für ein Repo sind Sprachen (Linguist) und Topics verfügbar (als Struct/Map zurückgeben).
 
 ---
 
