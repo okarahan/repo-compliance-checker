@@ -79,6 +79,8 @@ Jeder Task hat eine ID `**RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 - **RCC-17** — Evidence pro Fund (Dateipfad, kurzer Grund, Confidence)
 - **RCC-18** — Uncertainties sammeln (unklar, nicht parsebar, mehrdeutig)
 
+> **TODO / bewusst nicht im MVP:** Der keyword-basierte Scan in `DetectTechnologies` erfasst nur Zeilen, die das Keyword selbst enthalten. **Mehrzeilige Blöcke werden nicht aufgelöst** — z. B. Dependencies innerhalb eines `require ( ... )`-Blocks in `go.mod` oder eines `dependencies { ... }`-Blocks in Gradle. Für den MVP akzeptiert; später via Block-Awareness oder LLM-Klassifikation (ganze Datei) nachrüsten.
+
 **Done:** `RepoScanResult` mit erkannten Technologien + Evidence + Unsicherheiten.
 
 ---
