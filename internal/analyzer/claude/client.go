@@ -17,10 +17,10 @@ const (
 
 	// DefaultModel is used when Options.Model is empty. Adjust to a currently
 	// available model slug if needed.
-	DefaultModel = "claude-3-5-sonnet-latest"
+	DefaultModel = "claude-haiku-4-5-20251001"
 
 	// defaultMaxTokens caps the size of the model's response.
-	defaultMaxTokens = 1024
+	defaultMaxTokens = 4096
 )
 
 // Client is a minimal Anthropic Messages API client built on common.Client.
