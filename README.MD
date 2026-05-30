@@ -41,6 +41,16 @@ By decoupling the scanning from the reporting, we also decouple the requests to 
 
 We would like to build a **rule engine** that defines, per programming language, exactly what needs to be scanned: which files, which lines/sections, and which keywords to look for. Today this knowledge is partly hardcoded in the analyzer; turning it into a configurable rule set would make the parser more powerful and easier to extend (e.g. supporting multi-line blocks, new build systems, or new languages) without code changes.
 
+### Self-improving naming cache
+
+Whenever Claude maps a raw dependency to a technology — including technologies that are **not** on the allow-list — we could persist that result locally in a normalized form (`raw dependency -> canonical technology name`). Over time this builds up a formal vocabulary for things we previously did not know.
+
+The benefits:
+
+- **Fewer AI calls / lower cost.** Known dependencies can be resolved from the local cache without asking Claude again.
+- **More consistent naming.** A growing, curated mapping makes the canonical names more stable and reliable.
+- **Learning system.** Each new disallowed technology Claude discovers gives us a formal name for something we had not catalogued before.
+
 ## Development
 
 Run all unit tests:

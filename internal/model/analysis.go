@@ -16,3 +16,40 @@ type RawDependency struct {
 	// (e.g. "github.com/labstack/echo/v4", "testcontainers"). Used as input for mapping.
 	Name string
 }
+
+// Category classifies a detected technology.
+type Category string
+
+const (
+	CategoryLanguage  Category = "language"
+	CategoryFramework Category = "framework"
+	CategoryUtility   Category = "utility"
+	CategoryOther     Category = "other"
+)
+
+// Evidence points to where a detected technology was found.
+type Evidence struct {
+	// File is the repo-relative manifest path (e.g. "go.mod").
+	File string
+	// Snippet is the raw matched line that backs the detection.
+	Snippet string
+}
+
+// DetectedTechnology is a technology mapped from one or more raw dependencies,
+// with a canonical name and supporting evidence.
+type DetectedTechnology struct {
+	// Name is the canonical technology name (e.g. "Echo", "Spring").
+	Name string
+	// Category is language / framework / utility / other.
+	Category Category
+	// Evidence lists where the technology was detected.
+	Evidence []Evidence
+	// Confidence is the classifier's confidence in [0,1].
+	Confidence float64
+}
+
+// AnalysisResult is the outcome of mapping raw dependencies to technologies.
+type AnalysisResult struct {
+	Technologies  []DetectedTechnology
+	Uncertainties []string
+}

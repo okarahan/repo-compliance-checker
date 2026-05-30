@@ -3,15 +3,15 @@ package client
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
-	"time"
+
+	"github.com/okarahan/repo-compliance-checker/internal/common"
 )
 
+// Client is the GitHub-specific HTTP client. It wraps the reusable common.Client
+// and adds GitHub authentication + content negotiation as default headers.
 type Client struct {
-	baseURL    *url.URL
-	httpClient *http.Client
-	token      string
+	http *common.Client
 }
 
 type Options struct {
@@ -32,46 +32,35 @@ func New(token string, opts Options) (*Client, error) {
 	if base == "" {
 		base = "https://api.github.com/"
 	}
-	u, err := url.Parse(base)
-	if err != nil {
-		return nil, fmt.Errorf("parse base url: %w", err)
-	}
-	if u.Scheme == "" || u.Host == "" {
-		return nil, fmt.Errorf("base url must be absolute, got %q", base)
-	}
 
-	hc := opts.HTTPClient
-	if hc == nil {
-		hc = &http.Client{Timeout: 30 * time.Second}
-	}
-
-	return &Client{
-		baseURL:    u,
-		httpClient: hc,
-		token:      token,
-	}, nil
-}
-
-// NewRequest creates an authenticated GitHub API request.
-// path is appended to the BaseURL and may start with "/".
-func (c *Client) NewRequest(method, path string) (*http.Request, error) {
-	if c == nil || c.httpClient == nil || c.baseURL == nil {
-		return nil, fmt.Errorf("client is not initialized")
-	}
-
-	u := c.baseURL.ResolveReference(&url.URL{Path: strings.TrimSpace(path)})
-	req, err := http.NewRequest(method, u.String(), nil)
+	hc, err := common.New(common.Options{
+		BaseURL:    base,
+		HTTPClient: opts.HTTPClient,
+		Headers: map[string]string{
+			"Authorization": "Bearer " + token,
+			"Accept":        "application/vnd.github+json",
+			"User-Agent":    "repo-compliance-checker",
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "repo-compliance-checker")
-	return req, nil
+	return &Client{http: hc}, nil
+}
+
+// NewRequest creates an authenticated GitHub API request (GET-style, no body).
+// path is appended to the BaseURL and may start with "/".
+func (c *Client) NewRequest(method, path string) (*http.Request, error) {
+	if c == nil || c.http == nil {
+		return nil, fmt.Errorf("client is not initialized")
+	}
+	return c.http.NewRequest(method, path, nil)
 }
 
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
-	return c.httpClient.Do(req)
+	if c == nil || c.http == nil {
+		return nil, fmt.Errorf("client is not initialized")
+	}
+	return c.http.Do(req)
 }
-
