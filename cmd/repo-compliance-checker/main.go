@@ -90,13 +90,13 @@ func run(reposPath, allowedPath, manifestMapPath, envPath, workdir, outDir strin
 			continue
 		}
 
-		result, err := analyzeRepo(ctx, gh, classifier, owner, name, repo.Ref, manifestMap, allowed, workdir)
+		result, languages, err := analyzeRepo(ctx, gh, classifier, owner, name, repo.Ref, manifestMap, allowed, workdir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "skip %q: %v\n", repo.Slug, err)
 			continue
 		}
 
-		rep := report.Build(repo.Slug, result, allowed)
+		rep := report.Build(repo.Slug, result, languages, allowed)
 		path, err := report.Write(outDir, rep)
 		if err != nil {
 			return err
@@ -106,10 +106,17 @@ func run(reposPath, allowedPath, manifestMapPath, envPath, workdir, outDir strin
 		slog.Info("report written",
 			"repo", repo.Slug, "path", path,
 			"detected", c.DetectedCount, "allowed", c.AllowedCount,
-			"allowed_percentage", c.AllowedPercentage, "compliant", c.Compliant,
+			"language_pct", c.Categories.Language.CompliancePercentage,
+			"framework_pct", c.Categories.Framework.CompliancePercentage,
+			"utility_pct", c.Categories.Utility.CompliancePercentage,
+			"overall_pct", c.OverallCompliancePercentage, "compliant", c.Compliant,
 		)
-		fmt.Printf("%s: %d/%d allowed (%.1f%%), compliant=%t -> %s\n",
-			repo.Slug, c.AllowedCount, c.DetectedCount, c.AllowedPercentage, c.Compliant, path)
+		fmt.Printf("%s: overall %.1f%% (lang %.1f%% / framework %.1f%% / util %.1f%%), compliant=%t -> %s\n",
+			repo.Slug, c.OverallCompliancePercentage,
+			c.Categories.Language.CompliancePercentage,
+			c.Categories.Framework.CompliancePercentage,
+			c.Categories.Utility.CompliancePercentage,
+			c.Compliant, path)
 	}
 
 	return nil
@@ -123,10 +130,10 @@ func analyzeRepo(
 	manifestMap model.ManifestMapConfig,
 	allowed model.AllowedTechnologies,
 	workdir string,
-) (model.AnalysisResult, error) {
+) (model.AnalysisResult, map[string]int64, error) {
 	fetched, err := api_fetcher.FetchRepo(ctx, gh, owner, name, ref, manifestMap, workdir)
 	if err != nil {
-		return model.AnalysisResult{}, fmt.Errorf("fetch: %w", err)
+		return model.AnalysisResult{}, nil, fmt.Errorf("fetch: %w", err)
 	}
 	slog.Debug("fetched repo",
 		"owner", owner, "repo", name,
@@ -139,15 +146,15 @@ func analyzeRepo(
 
 	deps, err := analyzer.DetectDependencies(fetched, manifestMap)
 	if err != nil {
-		return model.AnalysisResult{}, fmt.Errorf("detect dependencies: %w", err)
+		return model.AnalysisResult{}, nil, fmt.Errorf("detect dependencies: %w", err)
 	}
 	slog.Debug("detected dependencies", "owner", owner, "repo", name, "count", len(deps), "dependencies", deps)
 
 	result, err := classifier.Classify(ctx, deps, allowed)
 	if err != nil {
-		return model.AnalysisResult{}, fmt.Errorf("classify: %w", err)
+		return model.AnalysisResult{}, nil, fmt.Errorf("classify: %w", err)
 	}
-	return result, nil
+	return result, fetched.Metadata.Languages, nil
 }
 
 func splitSlug(slug string) (owner, repo string, err error) {

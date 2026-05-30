@@ -9,32 +9,50 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/okarahan/repo-compliance-checker/internal/model"
 )
 
-// Build assembles a ComplianceReport from the analysis result for a repo,
-// flagging each detected technology as allowed/not-allowed and computing the
-// aggregate conclusion.
-func Build(slug string, result model.AnalysisResult, allowed model.AllowedTechnologies) model.ComplianceReport {
+// Build assembles a ComplianceReport from the analysis result for a repo. It
+// combines the GitHub Linguist languages (byte-weighted) with the technologies
+// classified from manifest dependencies, flags each as allowed/not-allowed, and
+// computes the aggregate conclusion.
+func Build(slug string, result model.AnalysisResult, languages map[string]int64, allowed model.AllowedTechnologies) model.ComplianceReport {
 	allowSet := allowedSet(allowed)
 
-	detected := make([]model.ReportedTechnology, 0, len(result.Technologies))
-	allowedCount := 0
+	detected := make([]model.ReportedTechnology, 0, len(languages)+len(result.Technologies))
+
+	// Languages come from GitHub Linguist, ordered by code size (descending).
+	for _, ls := range sortedLanguages(languages) {
+		detected = append(detected, model.ReportedTechnology{
+			Name:       ls.name,
+			Category:   model.CategoryLanguage,
+			Allowed:    allowSet[normalize(ls.name)],
+			Confidence: 1,
+			Bytes:      ls.bytes,
+			Evidence:   []model.Evidence{{File: "github linguist", Snippet: fmt.Sprintf("%d bytes", ls.bytes)}},
+		})
+	}
+
+	// Remaining technologies come from the dependency classification.
 	for _, t := range result.Technologies {
-		isAllowed := allowSet[normalize(t.Name)]
-		if isAllowed {
-			allowedCount++
-		}
 		detected = append(detected, model.ReportedTechnology{
 			Name:       t.Name,
 			Category:   t.Category,
-			Allowed:    isAllowed,
+			Allowed:    allowSet[normalize(t.Name)],
 			Confidence: t.Confidence,
 			Evidence:   t.Evidence,
 		})
+	}
+
+	allowedCount := 0
+	for _, d := range detected {
+		if d.Allowed {
+			allowedCount++
+		}
 	}
 
 	return model.ComplianceReport{
@@ -42,23 +60,121 @@ func Build(slug string, result model.AnalysisResult, allowed model.AllowedTechno
 		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
 		Detected:      detected,
 		Uncertainties: result.Uncertainties,
-		Conclusion:    conclude(len(detected), allowedCount),
+		Conclusion:    conclude(detected, languages, allowSet, allowedCount),
 	}
 }
 
-// conclude derives the aggregate compliance outcome. A repo is compliant only
-// when every detected technology is allowed. With no detected technologies there
-// is nothing non-compliant, so it counts as 100% / compliant.
-func conclude(detectedCount, allowedCount int) model.Conclusion {
-	percentage := 100.0
+// langStat is a language name paired with its Linguist byte count.
+type langStat struct {
+	name  string
+	bytes int64
+}
+
+// sortedLanguages returns the languages ordered by byte count (descending), then
+// by name, for deterministic report output.
+func sortedLanguages(languages map[string]int64) []langStat {
+	stats := make([]langStat, 0, len(languages))
+	for name, bytes := range languages {
+		if strings.TrimSpace(name) == "" {
+			continue
+		}
+		stats = append(stats, langStat{name: name, bytes: bytes})
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		if stats[i].bytes != stats[j].bytes {
+			return stats[i].bytes > stats[j].bytes
+		}
+		return stats[i].name < stats[j].name
+	})
+	return stats
+}
+
+// Category weights for the overall compliance score. They sum to 1.0.
+const (
+	weightLanguage  = 0.5
+	weightFramework = 0.3
+	weightUtility   = 0.2
+)
+
+// conclude derives the per-category compliance and the weighted overall score.
+// Languages are byte-weighted (Linguist code size); frameworks and utilities are
+// fractions of allowed technologies. A category with nothing detected counts as
+// 0%. The repo is compliant only when the weighted overall compliance is 100%.
+func conclude(detected []model.ReportedTechnology, languages map[string]int64, allowSet map[string]bool, allowedCount int) model.Conclusion {
+	lang := languageCompliance(languages, allowSet)
+	framework := categoryCompliance(detected, model.CategoryFramework)
+	util := categoryCompliance(detected, model.CategoryUtility)
+
+	overall := roundTo1(
+		weightLanguage*lang.CompliancePercentage +
+			weightFramework*framework.CompliancePercentage +
+			weightUtility*util.CompliancePercentage,
+	)
+
+	return model.Conclusion{
+		DetectedCount: len(detected),
+		AllowedCount:  allowedCount,
+		Categories: model.CategoryBreakdown{
+			Language:  lang,
+			Framework: framework,
+			Utility:   util,
+		},
+		OverallCompliancePercentage: overall,
+		Compliant:                   overall == 100,
+	}
+}
+
+// languageCompliance computes the language compliance weighted by code size:
+// the share of bytes belonging to allowed languages over the total bytes. With no
+// language bytes it is treated as 0%.
+func languageCompliance(languages map[string]int64, allowSet map[string]bool) model.CategoryCompliance {
+	var totalBytes, allowedBytes int64
+	var detectedCount, allowedCount int
+	for name, bytes := range languages {
+		if strings.TrimSpace(name) == "" {
+			continue
+		}
+		detectedCount++
+		totalBytes += bytes
+		if allowSet[normalize(name)] {
+			allowedCount++
+			allowedBytes += bytes
+		}
+	}
+
+	percentage := 0.0
+	if totalBytes > 0 {
+		percentage = roundTo1(float64(allowedBytes) / float64(totalBytes) * 100)
+	}
+	return model.CategoryCompliance{
+		DetectedCount:        detectedCount,
+		AllowedCount:         allowedCount,
+		CompliancePercentage: percentage,
+	}
+}
+
+// categoryCompliance computes the compliance for a single category. A category
+// with no detected technologies is treated as 0% compliant.
+func categoryCompliance(detected []model.ReportedTechnology, category model.Category) model.CategoryCompliance {
+	var detectedCount, allowedCount int
+	for _, t := range detected {
+		if t.Category != category {
+			continue
+		}
+		detectedCount++
+		if t.Allowed {
+			allowedCount++
+		}
+	}
+
+	percentage := 0.0
 	if detectedCount > 0 {
 		percentage = roundTo1(float64(allowedCount) / float64(detectedCount) * 100)
 	}
-	return model.Conclusion{
-		DetectedCount:     detectedCount,
-		AllowedCount:      allowedCount,
-		AllowedPercentage: percentage,
-		Compliant:         allowedCount == detectedCount,
+	return model.CategoryCompliance{
+		DetectedCount:        detectedCount,
+		AllowedCount:         allowedCount,
+		CompliancePercentage: percentage,
 	}
 }
 
