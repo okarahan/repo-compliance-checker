@@ -1,11 +1,7 @@
 {
   "repos": [
     {
-      "slug": "golang/go",
-      "ref": "master"
-    },
-    {
-      "slug": "kubernetes/kubernetes",
+      "slug": "bia-pain-bache/BPB-Wizard",
       "ref": "master"
     }
   ]

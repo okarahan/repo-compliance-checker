@@ -59,7 +59,7 @@ func DetectDependencies(result api_fetcher.RepoFetchResult, manifestCfg model.Ma
 			}
 			processed[file] = struct{}{}
 
-			lines, err := scanFile(filepath.Join(result.Manifest.Dir, filepath.FromSlash(file)), keywords)
+			lines, err := scanFile(filepath.Join(result.Manifest.Dir, filepath.FromSlash(file)), key, keywords)
 			if err != nil {
 				return nil, err
 			}
@@ -81,9 +81,14 @@ func DetectDependencies(result api_fetcher.RepoFetchResult, manifestCfg model.Ma
 	return findings, nil
 }
 
-// scanFile returns the trimmed lines of a file that contain any of the keywords.
-// If keywords is empty, every non-empty, non-comment line is returned.
-func scanFile(path string, keywords []string) ([]string, error) {
+// scanFile returns the trimmed candidate lines of a manifest file.
+//
+// It is block-aware for Go: dependencies inside a `require ( ... )` block span
+// multiple lines that do not themselves contain the `require` keyword, so we track
+// whether we are currently inside such a block. Outside of blocks (and for other
+// languages) it falls back to keyword matching; an empty keyword list means every
+// non-empty, non-comment line is a candidate.
+func scanFile(path, language string, keywords []string) ([]string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open manifest %q: %w", path, err)
@@ -91,12 +96,30 @@ func scanFile(path string, keywords []string) ([]string, error) {
 	defer f.Close()
 
 	var out []string
+	inGoRequireBlock := false
+
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || isComment(line) {
 			continue
 		}
+
+		if language == "go" {
+			if inGoRequireBlock {
+				if line == ")" {
+					inGoRequireBlock = false
+					continue
+				}
+				out = append(out, line)
+				continue
+			}
+			if isGoRequireBlockOpen(line) {
+				inGoRequireBlock = true
+				continue
+			}
+		}
+
 		if matchesKeyword(line, keywords) {
 			out = append(out, line)
 		}
@@ -105,6 +128,16 @@ func scanFile(path string, keywords []string) ([]string, error) {
 		return nil, fmt.Errorf("read manifest %q: %w", path, err)
 	}
 	return out, nil
+}
+
+// isGoRequireBlockOpen reports whether the line opens a `require ( ... )` block,
+// e.g. "require (".
+func isGoRequireBlockOpen(line string) bool {
+	if !strings.HasPrefix(line, "require") {
+		return false
+	}
+	rest := strings.TrimSpace(strings.TrimPrefix(line, "require"))
+	return rest == "("
 }
 
 func matchesKeyword(line string, keywords []string) bool {
