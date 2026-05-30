@@ -30,9 +30,9 @@ const (
 // Evidence points to where a detected technology was found.
 type Evidence struct {
 	// File is the repo-relative manifest path (e.g. "go.mod").
-	File string
+	File string `json:"file"`
 	// Snippet is the raw matched line that backs the detection.
-	Snippet string
+	Snippet string `json:"snippet"`
 }
 
 // DetectedTechnology is a technology mapped from one or more raw dependencies,

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher/client"
 	"github.com/okarahan/repo-compliance-checker/internal/config"
 	"github.com/okarahan/repo-compliance-checker/internal/model"
+	"github.com/okarahan/repo-compliance-checker/internal/report"
 )
 
 func main() {
@@ -23,12 +23,13 @@ func main() {
 	manifestMapPath := flag.String("manifest-map", "config/manifest_map.json", "path to manifest map config JSON")
 	envPath := flag.String("env", ".env", "path to .env file (tokens are read from the environment first)")
 	workdir := flag.String("workdir", "", "directory to download manifest files into (default: a temp dir per repo)")
+	outDir := flag.String("out", "reports", "directory to write JSON compliance reports into")
 	debug := flag.Bool("debug", true, "enable debug logging on stderr")
 	flag.Parse()
 
 	setupLogger(*debug)
 
-	if err := run(*reposPath, *allowedPath, *manifestMapPath, *envPath, *workdir); err != nil {
+	if err := run(*reposPath, *allowedPath, *manifestMapPath, *envPath, *workdir, *outDir); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
@@ -45,7 +46,7 @@ func setupLogger(debug bool) {
 	slog.SetDefault(slog.New(handler))
 }
 
-func run(reposPath, allowedPath, manifestMapPath, envPath, workdir string) error {
+func run(reposPath, allowedPath, manifestMapPath, envPath, workdir, outDir string) error {
 	repos, err := config.LoadRepos(reposPath)
 	if err != nil {
 		return err
@@ -95,9 +96,20 @@ func run(reposPath, allowedPath, manifestMapPath, envPath, workdir string) error
 			continue
 		}
 
-		if err := printResult(repo.Slug, result); err != nil {
+		rep := report.Build(repo.Slug, result, allowed)
+		path, err := report.Write(outDir, rep)
+		if err != nil {
 			return err
 		}
+
+		c := rep.Conclusion
+		slog.Info("report written",
+			"repo", repo.Slug, "path", path,
+			"detected", c.DetectedCount, "allowed", c.AllowedCount,
+			"allowed_percentage", c.AllowedPercentage, "compliant", c.Compliant,
+		)
+		fmt.Printf("%s: %d/%d allowed (%.1f%%), compliant=%t -> %s\n",
+			repo.Slug, c.AllowedCount, c.DetectedCount, c.AllowedPercentage, c.Compliant, path)
 	}
 
 	return nil
@@ -136,20 +148,6 @@ func analyzeRepo(
 		return model.AnalysisResult{}, fmt.Errorf("classify: %w", err)
 	}
 	return result, nil
-}
-
-func printResult(slug string, result model.AnalysisResult) error {
-	out := struct {
-		Repo   string               `json:"repo"`
-		Result model.AnalysisResult `json:"result"`
-	}{Repo: slug, Result: result}
-
-	b, err := json.MarshalIndent(out, "", "  ")
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(b))
-	return nil
 }
 
 func splitSlug(slug string) (owner, repo string, err error) {
