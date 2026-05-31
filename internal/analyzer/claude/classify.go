@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -99,6 +100,12 @@ func (c *Client) Classify(ctx context.Context, deps []model.RawDependency, allow
 		return model.AnalysisResult{}, fmt.Errorf("marshal prompt payload: %w", err)
 	}
 
+	slog.Debug("claude classify request",
+		"model", c.model,
+		"dependency_count", len(uniqueDeps),
+		"payload", jsonLogValue(string(payloadJSON)),
+	)
+
 	reqBody := messagesRequest{
 		Model:     c.model,
 		MaxTokens: c.maxTokens,
@@ -135,6 +142,12 @@ func (c *Client) Classify(ctx context.Context, deps []model.RawDependency, allow
 	}
 
 	text := joinText(msg.Content)
+	slog.Debug("claude classify response",
+		"model", c.model,
+		"status", resp.Status,
+		"response", jsonLogValue(text),
+	)
+
 	out, err := parseClassifyOutput(text)
 	if err != nil {
 		return model.AnalysisResult{}, err
@@ -170,6 +183,21 @@ func knownVocabulary(allowed model.AllowedTechnologies) []string {
 	out = append(out, allowed.Frameworks...)
 	out = append(out, allowed.Utilities...)
 	return out
+}
+
+// jsonLogValue returns a value suitable for structured logging. If text contains a
+// JSON object, it is returned as json.RawMessage so a JSON log handler embeds it as
+// real (unescaped) JSON; otherwise the raw string is returned as a fallback.
+func jsonLogValue(text string) any {
+	trimmed := strings.TrimSpace(text)
+	start := strings.Index(trimmed, "{")
+	end := strings.LastIndex(trimmed, "}")
+	if start >= 0 && end >= start {
+		if candidate := trimmed[start : end+1]; json.Valid([]byte(candidate)) {
+			return json.RawMessage(candidate)
+		}
+	}
+	return text
 }
 
 func joinText(blocks []contentBlock) string {

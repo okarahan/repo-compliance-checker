@@ -105,12 +105,17 @@ func createClaudeClient(envPath string) (*claude.Client, error) {
 
 // setupLogger configures the default slog logger to write to stderr, keeping stdout
 // reserved for the JSON result output.
+//
+// In debug mode it uses a JSON handler so every log line is valid JSON and can be
+// piped through jq (e.g. to inspect the raw Claude response); otherwise it uses a
+// human-friendly text handler.
 func setupLogger(debug bool) {
 	level := slog.LevelInfo
+	var handler slog.Handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
 	if debug {
 		level = slog.LevelDebug
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})
 	}
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
 	slog.SetDefault(slog.New(handler))
 }
 
