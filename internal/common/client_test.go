@@ -11,16 +11,16 @@ import (
 )
 
 func TestNew_requiresAbsoluteBaseURL(t *testing.T) {
-	if _, err := common.New(common.Options{}); err == nil {
+	if _, err := common.NewClient(common.ClientOptions{}); err == nil {
 		t.Fatal("expected error for empty base url")
 	}
-	if _, err := common.New(common.Options{BaseURL: "/relative"}); err == nil {
+	if _, err := common.NewClient(common.ClientOptions{BaseURL: "/relative"}); err == nil {
 		t.Fatal("expected error for non-absolute base url")
 	}
 }
 
 func TestClient_NewRequest_setsHeadersAndBody(t *testing.T) {
-	c, err := common.New(common.Options{
+	c, err := common.NewClient(common.ClientOptions{
 		BaseURL: "https://example.test/",
 		Headers: map[string]string{"X-Api-Key": "secret", "Content-Type": "application/json"},
 	})
@@ -54,7 +54,7 @@ func TestClient_Do(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c, err := common.New(common.Options{BaseURL: srv.URL})
+	c, err := common.NewClient(common.ClientOptions{BaseURL: srv.URL})
 	if err != nil {
 		t.Fatal(err)
 	}

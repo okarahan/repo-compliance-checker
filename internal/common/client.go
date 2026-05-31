@@ -19,7 +19,7 @@ type Client struct {
 	headers    map[string]string
 }
 
-type Options struct {
+type ClientOptions struct {
 	// BaseURL is the absolute API base URL (required), e.g. "https://api.github.com/".
 	BaseURL string
 
@@ -31,7 +31,8 @@ type Options struct {
 	Headers map[string]string
 }
 
-func New(opts Options) (*Client, error) {
+// NewClient builds a reusable HTTP Client from the given options.
+func NewClient(opts ClientOptions) (*Client, error) {
 	base := strings.TrimSpace(opts.BaseURL)
 	if base == "" {
 		return nil, fmt.Errorf("base url is required")

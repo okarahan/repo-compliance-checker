@@ -33,7 +33,7 @@ func New(token string, opts Options) (*Client, error) {
 		base = "https://api.github.com/"
 	}
 
-	hc, err := common.New(common.Options{
+	hc, err := common.NewClient(common.ClientOptions{
 		BaseURL:    base,
 		HTTPClient: opts.HTTPClient,
 		Headers: map[string]string{

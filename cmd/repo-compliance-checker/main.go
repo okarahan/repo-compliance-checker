@@ -18,22 +18,89 @@ import (
 	"github.com/okarahan/repo-compliance-checker/internal/report"
 )
 
-func main() {
-	reposPath := flag.String("repos", "config/repos.json", "path to repos config JSON")
-	allowedPath := flag.String("allowed", "config/allowed_technologies.json", "path to allowed technologies config JSON")
-	manifestMapPath := flag.String("manifest-map", "config/manifest_map.json", "path to manifest map config JSON")
-	envPath := flag.String("env", ".env", "path to .env file (tokens are read from the environment first)")
-	workdir := flag.String("workdir", "", "directory to download manifest files into (default: a temp dir per repo)")
-	outDir := flag.String("out", "reports", "directory to write JSON compliance reports into")
-	debug := flag.Bool("debug", false, "enable debug logging on stderr")
+// flags holds the parsed command-line configuration.
+type flags struct {
+	reposPath       string
+	allowedPath     string
+	manifestMapPath string
+	envPath         string
+	workdir         string
+	outDir          string
+	debug           bool
+}
+
+// setupFlags defines and parses the command-line flags.
+func setupFlags() flags {
+	var f flags
+	flag.StringVar(&f.reposPath, "repos", "config/repos.json", "path to repos config JSON")
+	flag.StringVar(&f.allowedPath, "allowed", "config/allowed_technologies.json", "path to allowed technologies config JSON")
+	flag.StringVar(&f.manifestMapPath, "manifest-map", "config/manifest_map.json", "path to manifest map config JSON")
+	flag.StringVar(&f.envPath, "env", ".env", "path to .env file (tokens are read from the environment first)")
+	flag.StringVar(&f.workdir, "workdir", "", "directory to download manifest files into (default: a temp dir per repo)")
+	flag.StringVar(&f.outDir, "out", "reports", "directory to write JSON compliance reports into")
+	flag.BoolVar(&f.debug, "debug", false, "enable debug logging on stderr")
 	flag.Parse()
+	return f
+}
 
-	setupLogger(*debug)
+func main() {
+	f := setupFlags()
 
-	if err := run(*reposPath, *allowedPath, *manifestMapPath, *envPath, *workdir, *outDir); err != nil {
+	setupLogger(f.debug)
+
+	if err := run(f); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
+}
+
+// loadedConfig bundles the three config files the tool needs.
+type loadedConfig struct {
+	repos       model.ReposConfig
+	allowed     model.AllowedTechnologies
+	manifestMap model.ManifestMapConfig
+}
+
+// loadConfig loads the repos, allowed-technologies and manifest-map config files.
+func loadConfig(f flags) (loadedConfig, error) {
+	repos, err := config.LoadRepos(f.reposPath)
+	if err != nil {
+		return loadedConfig{}, err
+	}
+	allowed, err := config.LoadAllowedTechnologies(f.allowedPath)
+	if err != nil {
+		return loadedConfig{}, err
+	}
+	manifestMap, err := config.LoadManifestMap(f.manifestMapPath)
+	if err != nil {
+		return loadedConfig{}, err
+	}
+
+	slog.Debug("loaded repos config", "path", f.reposPath, "count", len(repos.Repos), "repos", repos.Repos)
+	slog.Debug("loaded allowed technologies config", "path", f.allowedPath, "allowed", allowed)
+	slog.Debug("loaded manifest map config", "path", f.manifestMapPath, "manifest_map", manifestMap)
+
+	return loadedConfig{repos: repos, allowed: allowed, manifestMap: manifestMap}, nil
+}
+
+// createGithubClient reads the GitHub token (env first, then envPath) and builds
+// the GitHub API client.
+func createGithubClient(envPath string) (*client.Client, error) {
+	token, err := client.ReadGitHubToken(envPath)
+	if err != nil {
+		return nil, fmt.Errorf("github token: %w", err)
+	}
+	return client.New(token, client.Options{})
+}
+
+// createClaudeClient reads the Anthropic API key (env first, then envPath) and
+// builds the Claude classifier client.
+func createClaudeClient(envPath string) (*claude.Client, error) {
+	apiKey, err := claude.ReadAPIKey(envPath)
+	if err != nil {
+		return nil, fmt.Errorf("anthropic api key: %w", err)
+	}
+	return claude.New(apiKey, claude.Options{})
 }
 
 // setupLogger configures the default slog logger to write to stderr, keeping stdout
@@ -47,82 +114,73 @@ func setupLogger(debug bool) {
 	slog.SetDefault(slog.New(handler))
 }
 
-func run(reposPath, allowedPath, manifestMapPath, envPath, workdir, outDir string) error {
-	repos, err := config.LoadRepos(reposPath)
+func run(f flags) error {
+	cfg, err := loadConfig(f)
 	if err != nil {
 		return err
 	}
-	allowed, err := config.LoadAllowedTechnologies(allowedPath)
-	if err != nil {
-		return err
-	}
-	manifestMap, err := config.LoadManifestMap(manifestMapPath)
-	if err != nil {
-		return err
-	}
+	repos, allowed, manifestMap := cfg.repos, cfg.allowed, cfg.manifestMap
 
-	slog.Debug("loaded repos config", "path", reposPath, "count", len(repos.Repos), "repos", repos.Repos)
-	slog.Debug("loaded allowed technologies config", "path", allowedPath, "allowed", allowed)
-	slog.Debug("loaded manifest map config", "path", manifestMapPath, "manifest_map", manifestMap)
-
-	githubToken, err := client.ReadGitHubToken(envPath)
-	if err != nil {
-		return fmt.Errorf("github token: %w", err)
-	}
-	apiKey, err := claude.ReadAPIKey(envPath)
-	if err != nil {
-		return fmt.Errorf("anthropic api key: %w", err)
-	}
-
-	gh, err := client.New(githubToken, client.Options{})
+	gh, err := createGithubClient(f.envPath)
 	if err != nil {
 		return err
 	}
-	classifier, err := claude.New(apiKey, claude.Options{})
+	classifier, err := createClaudeClient(f.envPath)
 	if err != nil {
 		return err
 	}
 
 	ctx := context.Background()
 	for _, repo := range repos.Repos {
-		owner, name, err := splitSlug(repo.Slug)
+		result, languages, err := analyzeRepo(ctx, gh, classifier, repo.Slug, repo.Ref, manifestMap, allowed, f.workdir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "skip %q: %v\n", repo.Slug, err)
 			continue
 		}
 
-		result, languages, err := analyzeRepo(ctx, gh, classifier, owner, name, repo.Ref, manifestMap, allowed, workdir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "skip %q: %v\n", repo.Slug, err)
-			continue
-		}
-
-		rep := report.Build(repo.Slug, result, languages, allowed)
-		path, err := report.Write(outDir, rep)
-		if err != nil {
+		if err := generateReport(repo.Slug, result, languages, allowed, f.outDir); err != nil {
 			return err
 		}
-		htmlPath, err := render.Write(outDir, rep)
-		if err != nil {
-			return err
-		}
-
-		c := rep.Conclusion
-		slog.Info("report written",
-			"repo", repo.Slug, "path", path, "html", htmlPath,
-			"detected", c.DetectedCount, "allowed", c.AllowedCount,
-			"language_pct", c.Categories.Language.CompliancePercentage,
-			"framework_pct", c.Categories.Framework.CompliancePercentage,
-			"utility_pct", c.Categories.Utility.CompliancePercentage,
-			"overall_pct", c.OverallCompliancePercentage, "compliant", c.Compliant,
-		)
-		fmt.Printf("%s: overall %.1f%% (lang %.1f%% / framework %.1f%% / util %.1f%%), compliant=%t -> %s | %s\n",
-			repo.Slug, c.OverallCompliancePercentage,
-			c.Categories.Language.CompliancePercentage,
-			c.Categories.Framework.CompliancePercentage,
-			c.Categories.Utility.CompliancePercentage,
-			c.Compliant, path, htmlPath)
 	}
+
+	return nil
+}
+
+// generateReport builds the compliance report for a repo, writes the JSON and HTML
+// outputs into outDir, and logs/prints a short summary.
+func generateReport(
+	slug string,
+	result model.AnalysisResult,
+	languages map[string]int64,
+	allowed model.AllowedTechnologies,
+	outDir string,
+) error {
+	rep := report.Build(slug, result, languages, allowed)
+
+	path, err := report.Write(outDir, rep)
+	if err != nil {
+		return err
+	}
+	htmlPath, err := render.Write(outDir, rep)
+	if err != nil {
+		return err
+	}
+
+	c := rep.Conclusion
+	slog.Info("report written",
+		"repo", slug, "path", path, "html", htmlPath,
+		"detected", c.DetectedCount, "allowed", c.AllowedCount,
+		"language_pct", c.Categories.Language.CompliancePercentage,
+		"framework_pct", c.Categories.Framework.CompliancePercentage,
+		"utility_pct", c.Categories.Utility.CompliancePercentage,
+		"overall_pct", c.OverallCompliancePercentage, "compliant", c.Compliant,
+	)
+	fmt.Printf("%s: overall %.1f%% (lang %.1f%% / framework %.1f%% / util %.1f%%), compliant=%t -> %s | %s\n",
+		slug, c.OverallCompliancePercentage,
+		c.Categories.Language.CompliancePercentage,
+		c.Categories.Framework.CompliancePercentage,
+		c.Categories.Utility.CompliancePercentage,
+		c.Compliant, path, htmlPath)
 
 	return nil
 }
@@ -131,11 +189,16 @@ func analyzeRepo(
 	ctx context.Context,
 	gh *client.Client,
 	classifier *claude.Client,
-	owner, name, ref string,
+	slug, ref string,
 	manifestMap model.ManifestMapConfig,
 	allowed model.AllowedTechnologies,
 	workdir string,
 ) (model.AnalysisResult, map[string]int64, error) {
+	owner, name, err := splitSlug(slug)
+	if err != nil {
+		return model.AnalysisResult{}, nil, err
+	}
+
 	fetched, err := api_fetcher.FetchRepo(ctx, gh, owner, name, ref, manifestMap, workdir)
 	if err != nil {
 		return model.AnalysisResult{}, nil, fmt.Errorf("fetch: %w", err)

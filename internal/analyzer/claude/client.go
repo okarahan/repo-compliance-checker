@@ -52,7 +52,7 @@ func New(apiKey string, opts Options) (*Client, error) {
 		base = DefaultBaseURL
 	}
 
-	hc, err := common.New(common.Options{
+	hc, err := common.NewClient(common.ClientOptions{
 		BaseURL:    base,
 		HTTPClient: opts.HTTPClient,
 		Headers: map[string]string{
