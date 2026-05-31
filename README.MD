@@ -171,6 +171,7 @@ Other decisions:
 
 ## What I'd improve next with more time
 
+- **Refactor manifest parsing into per-file readers.** Today the analyzer branches on language/keywords inside one `scanFile` function (with a special case for `pom.xml`). A cleaner design: detect the language, resolve the concrete manifest file (e.g. `pom.xml`), then use a factory that returns a dedicated reader for that file (e.g. a `MavenReader`/`PomReader`, `GoModReader`, `RequirementsReader`), each behind a common `ManifestReader` interface. This isolates format-specific logic, makes multi-line/structured formats first-class, and lets new ecosystems be added by registering a new reader instead of extending a growing switch.
 - **Configurable rule engine.** Define, per language, exactly which files / sections / keywords to scan, instead of partly hardcoding this in the analyzer. This would make adding languages, build systems and multi-line blocks possible without code changes.
 - **Self-improving naming cache.** Persist `raw dependency -> canonical technology` mappings locally. Known dependencies could then be resolved without calling Claude, lowering cost and making canonical names more consistent over time.
 - **Decoupled scan & report jobs.** A scheduled scan job writes findings into a database (handling all GitHub interaction and rate limits); a separate report job builds reports from stored findings. Reporting rarely needs to be live.
