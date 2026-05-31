@@ -199,20 +199,20 @@ func analyzeRepo(
 		return model.AnalysisResult{}, nil, err
 	}
 
-	fetched, err := api_fetcher.FetchRepo(ctx, gh, owner, name, ref, manifestMap, workdir)
+	repoFetchResult, err := api_fetcher.FetchRepo(ctx, gh, owner, name, ref, manifestMap, workdir)
 	if err != nil {
 		return model.AnalysisResult{}, nil, fmt.Errorf("fetch: %w", err)
 	}
 	slog.Debug("fetched repo",
 		"owner", owner, "repo", name,
-		"languages", fetched.Metadata.Languages,
-		"topics", fetched.Metadata.Topics,
-		"downloaded", fetched.Manifest.Downloaded,
-		"missing", fetched.Manifest.Missing,
-		"dir", fetched.Manifest.Dir,
+		"languages", repoFetchResult.Metadata.Languages,
+		"topics", repoFetchResult.Metadata.Topics,
+		"downloaded", repoFetchResult.Manifest.Downloaded,
+		"missing", repoFetchResult.Manifest.Missing,
+		"dir", repoFetchResult.Manifest.Dir,
 	)
 
-	deps, err := analyzer.DetectDependencies(fetched, manifestMap)
+	deps, err := analyzer.DetectDependencies(repoFetchResult, manifestMap)
 	if err != nil {
 		return model.AnalysisResult{}, nil, fmt.Errorf("detect dependencies: %w", err)
 	}
@@ -222,7 +222,7 @@ func analyzeRepo(
 	if err != nil {
 		return model.AnalysisResult{}, nil, fmt.Errorf("classify: %w", err)
 	}
-	return result, fetched.Metadata.Languages, nil
+	return result, repoFetchResult.Metadata.Languages, nil
 }
 
 func splitSlug(slug string) (owner, repo string, err error) {

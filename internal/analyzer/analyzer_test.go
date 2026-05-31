@@ -72,6 +72,72 @@ func TestDetectDependencies(t *testing.T) {
 	}
 }
 
+func TestDetectDependencies_mavenPom(t *testing.T) {
+	dir := t.TempDir()
+
+	pom := strings.Join([]string{
+		`<?xml version="1.0" encoding="UTF-8"?>`,
+		`<project>`,
+		`  <dependencies>`,
+		`    <dependency>`,
+		`      <groupId>org.springframework.boot</groupId>`,
+		`      <artifactId>spring-boot-starter-web</artifactId>`,
+		`    </dependency>`,
+		`    <dependency>`,
+		`      <groupId>org.springframework.boot</groupId>`,
+		`      <artifactId>spring-boot-starter-data-jpa</artifactId>`,
+		`      <version>3.2.0</version>`,
+		`    </dependency>`,
+		`  </dependencies>`,
+		`</project>`,
+		``,
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(dir, "pom.xml"), []byte(pom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := api_fetcher.RepoFetchResult{
+		Metadata: api_fetcher.RepoMetadata{
+			Languages: endpoints.LanguagesResponse{"Java": 100},
+		},
+		Manifest: api_fetcher.ManifestDownload{
+			Dir:        dir,
+			Downloaded: []string{"pom.xml"},
+		},
+	}
+	manifestCfg := model.ManifestMapConfig{
+		ByLanguage: map[string]model.ManifestTargets{
+			"java": {Files: []string{"pom.xml"}},
+		},
+	}
+
+	findings, err := analyzer.DetectDependencies(result, manifestCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]bool{}
+	for _, f := range findings {
+		got[f.Name] = true
+	}
+
+	want := []string{
+		"org.springframework.boot:spring-boot-starter-web",
+		"org.springframework.boot:spring-boot-starter-data-jpa",
+	}
+	for _, w := range want {
+		if !got[w] {
+			t.Errorf("expected maven dependency %q, findings=%v", w, findings)
+		}
+	}
+	// the raw XML tag markers must not leak in as dependencies.
+	for bad := range got {
+		if strings.Contains(bad, "<") || strings.Contains(bad, ">") {
+			t.Errorf("XML markers should not be dependencies, got %q", bad)
+		}
+	}
+}
+
 func TestDetectDependencies_goRequireBlock(t *testing.T) {
 	dir := t.TempDir()
 

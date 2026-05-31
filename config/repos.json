@@ -3,6 +3,10 @@
     {
       "slug": "bia-pain-bache/BPB-Wizard",
       "ref": "main"
+    },
+    {
+      "slug": "scanurag/FoodFrenzy",
+      "ref": "master"
     }
   ]
 }

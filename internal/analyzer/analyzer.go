@@ -59,7 +59,7 @@ func DetectDependencies(result api_fetcher.RepoFetchResult, manifestCfg model.Ma
 			}
 			processed[file] = struct{}{}
 
-			lines, err := scanFile(filepath.Join(result.Manifest.Dir, filepath.FromSlash(file)), key, keywords)
+			lines, err := scanFile(filepath.Join(result.Manifest.Dir, filepath.FromSlash(file)), key, file, keywords)
 			if err != nil {
 				return nil, err
 			}
@@ -88,7 +88,15 @@ func DetectDependencies(result api_fetcher.RepoFetchResult, manifestCfg model.Ma
 // whether we are currently inside such a block. Outside of blocks (and for other
 // languages) it falls back to keyword matching; an empty keyword list means every
 // non-empty, non-comment line is a candidate.
-func scanFile(path, language string, keywords []string) ([]string, error) {
+//
+// Maven `pom.xml` is handled separately, because its dependencies are multi-line
+// XML blocks (`<dependency>...</dependency>`) whose identifier is split across the
+// `<groupId>` and `<artifactId>` child elements.
+func scanFile(path, language, file string, keywords []string) ([]string, error) {
+	if file == "pom.xml" {
+		return scanMavenPom(path)
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open manifest %q: %w", path, err)
@@ -138,6 +146,82 @@ func isGoRequireBlockOpen(line string) bool {
 	}
 	rest := strings.TrimSpace(strings.TrimPrefix(line, "require"))
 	return rest == "("
+}
+
+// scanMavenPom extracts the dependencies from a Maven pom.xml. Each
+// `<dependency>...</dependency>` block is collapsed into a single
+// "groupId:artifactId" identifier (falling back to whichever part is present).
+func scanMavenPom(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open manifest %q: %w", path, err)
+	}
+	defer f.Close()
+
+	var out []string
+	inDependency := false
+	var groupID, artifactID string
+
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+
+		if strings.Contains(line, "<dependency>") {
+			inDependency = true
+			groupID, artifactID = "", ""
+			continue
+		}
+		if !inDependency {
+			continue
+		}
+		if strings.Contains(line, "</dependency>") {
+			inDependency = false
+			if name := mavenName(groupID, artifactID); name != "" {
+				out = append(out, name)
+			}
+			continue
+		}
+		if v, ok := xmlTagValue(line, "groupId"); ok {
+			groupID = v
+		}
+		if v, ok := xmlTagValue(line, "artifactId"); ok {
+			artifactID = v
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("read manifest %q: %w", path, err)
+	}
+	return out, nil
+}
+
+// mavenName joins a Maven groupId and artifactId into "groupId:artifactId",
+// falling back to whichever part is present.
+func mavenName(groupID, artifactID string) string {
+	groupID = strings.TrimSpace(groupID)
+	artifactID = strings.TrimSpace(artifactID)
+	switch {
+	case groupID != "" && artifactID != "":
+		return groupID + ":" + artifactID
+	case artifactID != "":
+		return artifactID
+	default:
+		return groupID
+	}
+}
+
+// xmlTagValue returns the text content of a single-line XML element, e.g.
+// xmlTagValue("<groupId>org.springframework</groupId>", "groupId") -> "org.springframework".
+func xmlTagValue(line, tag string) (string, bool) {
+	open, closing := "<"+tag+">", "</"+tag+">"
+	i := strings.Index(line, open)
+	if i < 0 {
+		return "", false
+	}
+	j := strings.Index(line, closing)
+	if j < i+len(open) {
+		return "", false
+	}
+	return strings.TrimSpace(line[i+len(open) : j]), true
 }
 
 func matchesKeyword(line string, keywords []string) bool {
