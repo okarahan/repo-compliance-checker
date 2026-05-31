@@ -18,7 +18,6 @@ Jeder Task hat eine ID `**RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 | CLI              | `cmd/repo-compliance-checker/` | Einstieg, Flags, Orchestrierung                  |
 | Configuration    | `internal/config/`             | `repos.json` + `allowed_technologies.json` lesen |
 | API-Fetcher      | `internal/api_fetcher/`        | GitHub REST API: Token/HTTP + Metadaten/Dateien  |
-| Repo-Fetcher     | `internal/repo_fetcher/`       | Repo lokal bereitstellen (clone/download)        |
 | Analyzer         | `internal/analyzer/`           | Technologien im Repo erkennen                    |
 | Report           | `internal/report/`             | Compliance-Check + Report schreiben              |
 | Model (optional) | `internal/model/`              | Gemeinsame Structs (DetectedTech, Report)        |
@@ -36,17 +35,6 @@ Jeder Task hat eine ID `**RCC-<n>`** (Repo Compliance Checker). In Commit-Messag
 - **RCC-5** — *(Optional)* `settings.json` für Workdir, Output-Pfad, Strict-Mode
 
 **Done:** Config lädt beide Dateien und liefert Repos + Allowed-Set an den Rest.
-
----
-
-## Package: `repo_fetcher` (Repository Acquisition)
-
-- **RCC-6** — Checkout-Strategie festlegen (git shallow clone vs. ZIP-Fallback)
-- **RCC-7** — Arbeitsverzeichnis (z. B. `.work/`) anlegen und bei erneutem Lauf wiederverwenden
-- **RCC-8** — Fehlerfälle behandeln (Repo nicht gefunden, kein Netz, falscher Slug)
-- **RCC-9** — Lokalen Pfad zum Repo-Root zurückgeben (für Analyzer)
-
-**Done:** Für jeden Slug aus `repos.json` liegt ein analysierbares Verzeichnis vor.
 
 ---
 
