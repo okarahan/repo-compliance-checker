@@ -14,6 +14,7 @@ import (
 	"github.com/okarahan/repo-compliance-checker/internal/api_fetcher/client"
 	"github.com/okarahan/repo-compliance-checker/internal/config"
 	"github.com/okarahan/repo-compliance-checker/internal/model"
+	"github.com/okarahan/repo-compliance-checker/internal/render"
 	"github.com/okarahan/repo-compliance-checker/internal/report"
 )
 
@@ -24,7 +25,7 @@ func main() {
 	envPath := flag.String("env", ".env", "path to .env file (tokens are read from the environment first)")
 	workdir := flag.String("workdir", "", "directory to download manifest files into (default: a temp dir per repo)")
 	outDir := flag.String("out", "reports", "directory to write JSON compliance reports into")
-	debug := flag.Bool("debug", true, "enable debug logging on stderr")
+	debug := flag.Bool("debug", false, "enable debug logging on stderr")
 	flag.Parse()
 
 	setupLogger(*debug)
@@ -101,22 +102,26 @@ func run(reposPath, allowedPath, manifestMapPath, envPath, workdir, outDir strin
 		if err != nil {
 			return err
 		}
+		htmlPath, err := render.Write(outDir, rep)
+		if err != nil {
+			return err
+		}
 
 		c := rep.Conclusion
 		slog.Info("report written",
-			"repo", repo.Slug, "path", path,
+			"repo", repo.Slug, "path", path, "html", htmlPath,
 			"detected", c.DetectedCount, "allowed", c.AllowedCount,
 			"language_pct", c.Categories.Language.CompliancePercentage,
 			"framework_pct", c.Categories.Framework.CompliancePercentage,
 			"utility_pct", c.Categories.Utility.CompliancePercentage,
 			"overall_pct", c.OverallCompliancePercentage, "compliant", c.Compliant,
 		)
-		fmt.Printf("%s: overall %.1f%% (lang %.1f%% / framework %.1f%% / util %.1f%%), compliant=%t -> %s\n",
+		fmt.Printf("%s: overall %.1f%% (lang %.1f%% / framework %.1f%% / util %.1f%%), compliant=%t -> %s | %s\n",
 			repo.Slug, c.OverallCompliancePercentage,
 			c.Categories.Language.CompliancePercentage,
 			c.Categories.Framework.CompliancePercentage,
 			c.Categories.Utility.CompliancePercentage,
-			c.Compliant, path)
+			c.Compliant, path, htmlPath)
 	}
 
 	return nil

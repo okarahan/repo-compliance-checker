@@ -4,7 +4,7 @@
 
 The Repo Compliance Checker analyzes one or more GitHub repositories and reports whether they appear to use only **approved technologies**.
 
-For each configured repository it fetches the languages (GitHub Linguist) and the dependency manifests (e.g. `go.mod`, `package.json`, `requirements.txt`), extracts the raw dependencies, and uses **Claude** to map those dependencies to concrete technology names. It then compares everything against a configurable allow-list and writes a **JSON compliance report** per repository, including a per-category and an overall, weighted compliance score.
+For each configured repository it fetches the languages (GitHub Linguist) and the dependency manifests (e.g. `go.mod`, `package.json`, `requirements.txt`), extracts the raw dependencies, and uses **Claude** to map those dependencies to concrete technology names. It then compares everything against a configurable allow-list and writes a **JSON compliance report** (plus a rendered **HTML view**) per repository, including a per-category and an overall, weighted compliance score.
 
 The project is intentionally timeboxed and heuristic-based: it aims to be explainable (every finding carries evidence) and to communicate uncertainty rather than to be perfect.
 
@@ -35,11 +35,13 @@ With the defaults (reads `config/*.json`, writes reports into `reports/`):
 go run ./cmd/repo-compliance-checker
 ```
 
-The tool prints a short summary per repo to stdout and writes a full JSON report into `reports/`:
+The tool prints a short summary per repo to stdout and writes a full JSON report plus an HTML view into `reports/`:
 
 ```
-bia-pain-bache/BPB-Wizard: overall 46.5% (lang 92.9% / framework 0.0% / util 0.0%), compliant=false -> reports/bia-pain-bache__BPB-Wizard.json
+bia-pain-bache/BPB-Wizard: overall 46.5% (lang 92.9% / framework 0.0% / util 0.0%), compliant=false -> reports/bia-pain-bache__BPB-Wizard.json | reports/bia-pain-bache__BPB-Wizard.html
 ```
+
+Open the `.html` file in a browser for a readable overview (overall score, per-category bars, and a table of detected technologies).
 
 ### Flags
 
@@ -126,7 +128,7 @@ The pipeline runs per repository:
 2. **Fetch manifests** — language-gated download of the manifest files from `manifest_map.json` at the configured ref (missing files are recorded as gaps, not errors).
 3. **Extract raw dependencies** — deterministically scan the manifests and collect candidate dependency lines as evidence (file + line).
 4. **Classify with Claude** — send the extracted dependency identifiers plus the allow-list vocabulary to Claude, which maps each dependency to a canonical technology name and category.
-5. **Build the report** — flag every detected technology as allowed / not-allowed, compute per-category and overall compliance, and write a JSON report to `reports/`.
+5. **Build the report** — flag every detected technology as allowed / not-allowed, compute per-category and overall compliance, and write a JSON report (and a rendered HTML view) to `reports/`.
 
 ### Compliance scoring
 
